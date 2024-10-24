@@ -13,4 +13,16 @@ abstract class BaseWaitStrategy implements WaitStrategy
     }
 
     abstract public function wait(StartedTestContainer $container): void;
+
+    public function withTimeout(int $timeout): static
+    {
+        $this->timeout = $timeout;
+        return $this;
+    }
+
+    public function withPollInterval(int $pollInterval): static
+    {
+        $this->pollInterval = $pollInterval;
+        return $this;
+    }
 }

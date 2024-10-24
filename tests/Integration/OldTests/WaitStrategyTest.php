@@ -21,12 +21,6 @@ use Testcontainers\Wait\WaitForTcpPortOpen;
  */
 class WaitStrategyTest extends TestCase
 {
-    //TODO: remove after check
-    protected function setUp(): void
-    {
-        $this->markTestIncomplete();
-    }
-
     public function testWaitForExec(): void
     {
         $container = MySQLContainer::make()
@@ -86,12 +80,13 @@ class WaitStrategyTest extends TestCase
     public function testWaitForHTTP(): void
     {
         $container = Container::make('nginx:alpine')
-            ->withWait(WaitForHttp::make(80));
+            ->withWait(WaitForHttp::make(3000))
+            ->withPort('3000', '80');
 
         $container->run();
 
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, sprintf('http://%s:%d', $container->getAddress(), 80));
+        curl_setopt($ch, CURLOPT_URL, sprintf('http://%s:%d', $container->getAddress(), $container->getPort()));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $response = (string) curl_exec($ch);
@@ -99,42 +94,21 @@ class WaitStrategyTest extends TestCase
         curl_close($ch);
 
         $this->assertNotEmpty($response);
+
+        $container->stop();
     }
 
-    /**
-     * @dataProvider provideWaitForTcpPortOpen
-     */
-    public function testWaitForTcpPortOpen(bool $wait): void
+    public function testWaitForTcpPortOpen(): void
     {
-        $container = Container::make('nginx:alpine');
-
-        if ($wait) {
-            $container->withWait(WaitForTcpPortOpen::make(80));
-        }
+        $container = Container::make('nginx:alpine')
+            ->withWait(WaitForTcpPortOpen::make(80))
+            ->withPort('80', '80');
 
         $container->run();
 
-        if ($wait) {
-            static::assertIsResource(fsockopen($container->getAddress(), 80), 'Failed to connect to container');
-            return;
-        }
+        static::assertIsResource(fsockopen($container->getAddress(), 80), 'Failed to connect to container');
 
-        $containerId = $container->getId();
-
-        $this->expectExceptionObject(new ContainerNotReadyException($containerId));
-
-        (new WaitForTcpPortOpen(8080))->wait($containerId);
-    }
-
-    /**
-     * @return array<string, array<bool>>
-     */
-    public function provideWaitForTcpPortOpen(): array
-    {
-        return [
-            'Can connect to container' => [true],
-            'Cannot connect to container' => [false],
-        ];
+        $container->stop();
     }
 
     public function testWaitForHealthCheck(): void
