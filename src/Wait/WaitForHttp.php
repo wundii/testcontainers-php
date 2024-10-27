@@ -48,6 +48,9 @@ class WaitForHttp extends BaseWaitStrategy
         return new self($port);
     }
 
+    /**
+     * @param HttpMethod|value-of<HttpMethod> $method
+     */
     public function withMethod(HttpMethod | string $method): self
     {
         if (is_string($method)) {
