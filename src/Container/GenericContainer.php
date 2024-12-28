@@ -29,6 +29,16 @@ class GenericContainer implements TestContainer
 
     protected string $image;
 
+    protected ?string $name = null;
+
+    /**
+     * User-defined key/value metadata.
+     * @param array<string, string>|null $labels
+     */
+    protected ?array $labels = null;
+
+    protected ?string $hostname = null;
+
     protected string $id;
 
     /** @var list<string> */
@@ -140,9 +150,20 @@ class GenericContainer implements TestContainer
         return $this;
     }
 
+    public function withHostname(string $hostname): static
+    {
+        $this->hostname = $hostname;
+
+        return $this;
+    }
+
     public function withMount(string $localPath, string $containerPath): static
     {
-        $this->mounts[] = new Mount(['type' => 'bind', 'source' => $localPath, 'target' => $containerPath]);
+        $this->mounts[] = new Mount([
+            'type' => 'bind',
+            'source' => $localPath,
+            'target' => $containerPath,
+        ]);
 
         return $this;
     }
@@ -166,6 +187,23 @@ class GenericContainer implements TestContainer
                 $this->exposedPorts[] = PortNormalizer::normalizePort($port);
             }
         }
+
+        return $this;
+    }
+
+    public function withName(string $name): static
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    /**
+     * @param array<string, string> $labels
+     */
+    public function withLabels(array $labels): static
+    {
+        $this->labels = $labels;
 
         return $this;
     }
@@ -196,9 +234,13 @@ class GenericContainer implements TestContainer
     {
         $this->startAttempts++;
         $containerConfig = $this->createContainerConfig();
+        $queryParameters = [];
+        if ($this->name !== null) {
+            $queryParameters['name'] = $this->name;
+        }
         try {
             /** @var ContainerCreateResponse|null $containerCreateResponse */
-            $containerCreateResponse = $this->dockerClient->containerCreate($containerConfig);
+            $containerCreateResponse = $this->dockerClient->containerCreate($containerConfig, $queryParameters);
             $this->id = $containerCreateResponse?->getId() ?? '';
         } catch (ContainerCreateNotFoundException) {
             if ($this->startAttempts >= self::MAX_START_ATTEMPTS) {
@@ -223,6 +265,8 @@ class GenericContainer implements TestContainer
         $containerCreatePostBody = new ContainersCreatePostBody();
         $containerCreatePostBody->setImage($this->image);
         $containerCreatePostBody->setCmd($this->command);
+        $containerCreatePostBody->setLabels($this->labels);
+        $containerCreatePostBody->setHostname($this->hostname);
 
         $envs = array_map(static fn ($key, $value) => "$key=$value", array_keys($this->env), $this->env);
         $containerCreatePostBody->setEnv($envs);

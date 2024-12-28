@@ -32,16 +32,6 @@ class Container extends GenericContainer
     }
 
     /**
-     * @deprecated Use `withEntrypoint` instead
-     * TODO: this is just dummy method for compatibility,
-     * the implementation with Docker Engine API should be discussed
-     */
-    public function withHostname(string $hostname): self
-    {
-        return $this;
-    }
-
-    /**
      * @deprecated Use `withPrivilegedMode` instead
      */
     public function withPrivileged(bool $privileged = true): self
