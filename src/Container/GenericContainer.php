@@ -33,7 +33,7 @@ class GenericContainer implements TestContainer
 
     /**
      * User-defined key/value metadata.
-     * @param array<string, string>|null $labels
+     * @var array<string, string>|null $labels
      */
     protected ?array $labels = null;
 
