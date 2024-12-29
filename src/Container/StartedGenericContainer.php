@@ -23,7 +23,6 @@ class StartedGenericContainer implements StartedTestContainer
         $this->dockerClient = DockerContainerClient::getDockerClient();
     }
 
-
     public function getId(): string
     {
         return $this->id;
