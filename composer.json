@@ -23,7 +23,7 @@
         "ext-pdo_mysql": "*",
         "ext-pdo_pgsql": "*",
         "phpunit/phpunit": "^9.5",
-        "brianium/paratest": "^6.6",
+        "brianium/paratest": "^6.11",
         "friendsofphp/php-cs-fixer": "^3.12",
         "phpstan/phpstan": "^1.8",
         "phpstan/phpstan-phpunit": "^1.1",
@@ -41,7 +41,8 @@
         }
     },
     "scripts": {
-        "integration": "paratest tests/ --bootstrap vendor/autoload.php -f",
+        "integration": "paratest tests/ --exclude-group=legacy --bootstrap vendor/autoload.php -f",
+        "integration:old": "phpunit tests/Integration/OldTests --bootstrap vendor/autoload.php",
         "cs": "php-cs-fixer fix --dry-run",
         "cs:fix": "php-cs-fixer fix",
         "phpstan": "phpstan analyse"

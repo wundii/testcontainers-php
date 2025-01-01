@@ -17,6 +17,7 @@ use Testcontainers\Wait\WaitForLog;
 use Testcontainers\Wait\WaitForTcpPortOpen;
 
 /**
+ * @group legacy
  * Old test classes kept to check backward compatibility
  */
 class WaitStrategyTest extends TestCase

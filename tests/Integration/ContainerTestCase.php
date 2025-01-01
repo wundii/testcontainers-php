@@ -9,10 +9,11 @@ use Testcontainers\Container\StartedTestContainer;
 
 abstract class ContainerTestCase extends TestCase
 {
-    protected static StartedTestContainer $container;
+    protected StartedTestContainer $container;
 
     protected function tearDown(): void
     {
-        self::$container->stop();
+        $this->container->stop();
+        parent::tearDown();
     }
 }
