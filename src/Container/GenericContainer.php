@@ -121,9 +121,8 @@ class GenericContainer implements TestContainer
      */
     public function withCopyFilesToContainer(array $files): static
     {
-        foreach ($files as $file) {
-            $this->filesToCopy[] = $file;
-        }
+        $this->filesToCopy = array_merge($this->filesToCopy, $files);
+
         return $this;
     }
 
@@ -132,9 +131,8 @@ class GenericContainer implements TestContainer
      */
     public function withCopyDirectoriesToContainer(array $directories): static
     {
-        foreach ($directories as $directory) {
-            $this->directoriesToCopy[] = $directory;
-        }
+        $this->directoriesToCopy = array_merge($this->directoriesToCopy, $directories);
+
         return $this;
     }
 
@@ -143,9 +141,8 @@ class GenericContainer implements TestContainer
      */
     public function withCopyContentToContainer(array $contents): static
     {
-        foreach ($contents as $content) {
-            $this->contentsToCopy[] = $content;
-        }
+        $this->contentsToCopy = array_merge($this->contentsToCopy, $contents);
+
         return $this;
     }
 
