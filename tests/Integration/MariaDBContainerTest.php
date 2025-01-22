@@ -8,9 +8,9 @@ use Testcontainers\Modules\MariaDBContainer;
 
 class MariaDBContainerTest extends ContainerTestCase
 {
-    public static function setUpBeforeClass(): void
+    public function setUp(): void
     {
-        self::$container = (new MariaDBContainer())
+        $this->container = (new MariaDBContainer())
             ->withMariaDBDatabase('foo')
             ->withMariaDBUser('bar', 'baz')
             ->start();
@@ -21,8 +21,8 @@ class MariaDBContainerTest extends ContainerTestCase
         $pdo = new \PDO(
             sprintf(
                 'mysql:host=%s;port=%d',
-                self::$container->getHost(),
-                self::$container->getFirstMappedPort()
+                $this->container->getHost(),
+                $this->container->getFirstMappedPort()
             ),
             'bar',
             'baz',

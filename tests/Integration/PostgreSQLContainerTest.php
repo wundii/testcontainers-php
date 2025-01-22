@@ -8,9 +8,9 @@ use Testcontainers\Modules\PostgresContainer;
 
 class PostgreSQLContainerTest extends ContainerTestCase
 {
-    public static function setUpBeforeClass(): void
+    public function setUp(): void
     {
-        self::$container = (new PostgresContainer())
+        $this->container = (new PostgresContainer())
             ->withPostgresUser('bar')
             ->withPostgresDatabase('foo')
             ->start();
@@ -21,8 +21,8 @@ class PostgreSQLContainerTest extends ContainerTestCase
         $pdo = new \PDO(
             sprintf(
                 'pgsql:host=%s;port=%d;dbname=foo',
-                self::$container->getHost(),
-                self::$container->getFirstMappedPort()
+                $this->container->getHost(),
+                $this->container->getFirstMappedPort()
             ),
             'bar',
             'test',

@@ -8,9 +8,9 @@ use Testcontainers\Modules\MySQLContainer;
 
 class MySQLContainerTest extends ContainerTestCase
 {
-    public static function setUpBeforeClass(): void
+    public function setUp(): void
     {
-        self::$container = (new MySQLContainer())
+        $this->container = (new MySQLContainer())
             ->withMySQLDatabase('foo')
             ->withMySQLUser('bar', 'baz')
             ->start();
@@ -21,8 +21,8 @@ class MySQLContainerTest extends ContainerTestCase
         $pdo = new \PDO(
             sprintf(
                 'mysql:host=%s;port=%d',
-                self::$container->getHost(),
-                self::$container->getFirstMappedPort()
+                $this->container->getHost(),
+                $this->container->getFirstMappedPort()
             ),
             'bar',
             'baz',

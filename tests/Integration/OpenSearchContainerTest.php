@@ -8,9 +8,9 @@ use Testcontainers\Modules\OpenSearchContainer;
 
 class OpenSearchContainerTest extends ContainerTestCase
 {
-    public static function setUpBeforeClass(): void
+    public function setUp(): void
     {
-        self::$container = (new OpenSearchContainer())
+        $this->container = (new OpenSearchContainer())
             ->withDisabledSecurityPlugin()
             ->start();
     }
@@ -23,8 +23,8 @@ class OpenSearchContainerTest extends ContainerTestCase
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, sprintf(
             'http://%s:%d',
-            self::$container->getHost(),
-            self::$container->getFirstMappedPort()
+            $this->container->getHost(),
+            $this->container->getFirstMappedPort()
         ));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 

@@ -9,17 +9,17 @@ use Testcontainers\Modules\RedisContainer;
 
 class RedisContainerTest extends ContainerTestCase
 {
-    public static function setUpBeforeClass(): void
+    public function setUp(): void
     {
-        self::$container = (new RedisContainer())
+        $this->container = (new RedisContainer())
             ->start();
     }
 
     public function testRedisContainer(): void
     {
         $redisClient = new Client([
-            'host' => self::$container->getHost(),
-            'port' => self::$container->getFirstMappedPort(),
+            'host' => $this->container->getHost(),
+            'port' => $this->container->getFirstMappedPort(),
         ]);
 
         $redisClient->ping();

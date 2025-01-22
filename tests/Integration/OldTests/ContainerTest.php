@@ -13,6 +13,7 @@ use Testcontainers\Container\PostgresContainer;
 use Testcontainers\Container\RedisContainer;
 
 /**
+ * @group legacy
  * Old test classes kept to check backward compatibility
  */
 class ContainerTest extends TestCase

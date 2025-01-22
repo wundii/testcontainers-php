@@ -16,10 +16,12 @@ use Docker\API\Model\PortBinding;
 use Docker\Docker;
 use Docker\Stream\CreateImageStream;
 use InvalidArgumentException;
+use RuntimeException;
 use Testcontainers\ContainerClient\DockerContainerClient;
 use Testcontainers\Utils\PortGenerator\PortGenerator;
 use Testcontainers\Utils\PortGenerator\RandomUniquePortGenerator;
 use Testcontainers\Utils\PortNormalizer;
+use Testcontainers\Utils\TarBuilder;
 use Testcontainers\Wait\WaitForContainer;
 use Testcontainers\Wait\WaitStrategy;
 
@@ -58,7 +60,27 @@ class GenericContainer implements TestContainer
     protected PortGenerator $portGenerator;
 
     protected bool $isPrivileged = false;
+
     protected ?string $networkName = null;
+
+    protected ?string $user = null;
+
+    protected ?string $workingDir = null;
+
+    /**
+     * @var array<array{source: string, target: string, mode?: int}>
+     */
+    protected array $filesToCopy = [];
+
+    /**
+     * @var array<array{source: string, target: string, mode?: int}>
+     */
+    protected array $directoriesToCopy = [];
+
+    /**
+     * @var array<array{content: string, target: string, mode?: int}>
+     */
+    protected array $contentsToCopy = [];
 
     protected int $startAttempts = 0;
     protected const MAX_START_ATTEMPTS = 2;
@@ -90,6 +112,36 @@ class GenericContainer implements TestContainer
     public function withCommand(array $command): static
     {
         $this->command = $command;
+
+        return $this;
+    }
+
+    /**
+     * @param array<array{source: string, target: string, mode?: int}> $files
+     */
+    public function withCopyFilesToContainer(array $files): static
+    {
+        $this->filesToCopy = array_merge($this->filesToCopy, $files);
+
+        return $this;
+    }
+
+    /**
+     * @param array<array{source: string, target: string, mode?: int}> $directories
+     */
+    public function withCopyDirectoriesToContainer(array $directories): static
+    {
+        $this->directoriesToCopy = array_merge($this->directoriesToCopy, $directories);
+
+        return $this;
+    }
+
+    /**
+     * @param array<array{content: string, target: string, mode?: int}> $contents
+     */
+    public function withCopyContentToContainer(array $contents): static
+    {
+        $this->contentsToCopy = array_merge($this->contentsToCopy, $contents);
 
         return $this;
     }
@@ -230,6 +282,20 @@ class GenericContainer implements TestContainer
         return $this;
     }
 
+    public function withUser(string $user): static
+    {
+        $this->user = $user;
+
+        return $this;
+    }
+
+    public function withWorkingDir(string $workingDir): static
+    {
+        $this->workingDir = $workingDir;
+
+        return $this;
+    }
+
     public function start(): StartedGenericContainer
     {
         $this->startAttempts++;
@@ -244,7 +310,7 @@ class GenericContainer implements TestContainer
             $this->id = $containerCreateResponse?->getId() ?? '';
         } catch (ContainerCreateNotFoundException) {
             if ($this->startAttempts >= self::MAX_START_ATTEMPTS) {
-                throw new \RuntimeException("Failed to start container after pulling image.");
+                throw new RuntimeException("Failed to start container after pulling image.");
             }
             // If the image is not found, pull it and try again
             // TODO: add withPullPolicy support
@@ -254,11 +320,83 @@ class GenericContainer implements TestContainer
 
         $this->dockerClient->containerStart($this->id);
 
+        if ($this->filesToCopy !== [] || $this->directoriesToCopy !== [] || $this->contentsToCopy !== []) {
+            $this->copyToContainer();
+        }
+
         $startedContainer = new StartedGenericContainer($this->id);
         $this->waitStrategy->wait($startedContainer);
 
         return $startedContainer;
     }
+
+    /**
+     * Uploads a tar archive containing files/directories/content to the container,
+     * extracting it into a chosen directory (`$containerPath`). Allows setting
+     * Docker's `noOverwriteDirNonDir` and `copyUIDGID` query parameters.
+     *
+     * @param string $containerPath Path within the container to extract the tar contents. Must be a directory in the container.
+     * @param bool $noOverwriteDirNonDir If true, Docker will error if it would replace an existing directory with a non-directory and vice versa.
+     * @param bool $copyUIDGID If true, Docker will attempt to preserve UID/GID from the tar entries.
+     * @throws RuntimeException|InvalidArgumentException
+     */
+    protected function copyToContainer(
+        string $containerPath = '/',
+        bool $noOverwriteDirNonDir = false,
+        bool $copyUIDGID = false
+    ): void {
+        $tarBuilder = new TarBuilder();
+        foreach ($this->filesToCopy as $file) {
+            $tarBuilder->addFile($file['source'], $file['target'], $file['mode'] ?? null);
+        }
+
+        foreach ($this->directoriesToCopy as $directory) {
+            $tarBuilder->addDirectory($directory['source'], $directory['target'], $directory['mode'] ?? null);
+        }
+
+        foreach ($this->contentsToCopy as $content) {
+            $tarBuilder->addContent($content['content'], $content['target'], $content['mode'] ?? null);
+        }
+
+        $tarFilePath = $tarBuilder->buildTarArchive();
+
+        if (!is_file($tarFilePath)) {
+            throw new RuntimeException("Tar file does not exist at: $tarFilePath");
+        }
+
+        $handle = fopen($tarFilePath, 'rb');
+
+        if ($handle === false) {
+            throw new RuntimeException("Cannot open temporary tar archive at: $tarFilePath");
+        }
+
+        $queryParams = [
+            'path' => $containerPath,
+        ];
+
+        if ($noOverwriteDirNonDir) {
+            $queryParams['noOverwriteDirNonDir'] = 'true';
+        }
+
+        if ($copyUIDGID) {
+            $queryParams['copyUIDGID'] = 'true';
+        }
+
+        /**
+         * TODO: should be improved. Currently without using dummy $result or FETCH_RESPONSE, the request is failing.
+         * Probably an issue with the beluga-php/docker-php client library.
+         * */
+        $result = $this->dockerClient->putContainerArchive(
+            $this->id,
+            $handle,
+            $queryParams,
+            $this->dockerClient::FETCH_RESPONSE
+        );
+
+        fclose($handle);
+        unlink($tarFilePath);
+    }
+
 
     protected function createContainerConfig(): ContainersCreatePostBody
     {
@@ -267,6 +405,8 @@ class GenericContainer implements TestContainer
         $containerCreatePostBody->setCmd($this->command);
         $containerCreatePostBody->setLabels($this->labels);
         $containerCreatePostBody->setHostname($this->hostname);
+        $containerCreatePostBody->setWorkingDir($this->workingDir);
+        $containerCreatePostBody->setUser($this->user);
 
         $envs = array_map(static fn ($key, $value) => "$key=$value", array_keys($this->env), $this->env);
         $containerCreatePostBody->setEnv($envs);
