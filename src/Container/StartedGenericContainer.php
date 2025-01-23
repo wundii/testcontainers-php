@@ -10,7 +10,9 @@ use Docker\API\Model\IdResponse;
 use Docker\API\Runtime\Client\Client as DockerRuntimeClient;
 use Docker\Docker;
 use Psr\Http\Message\ResponseInterface;
+use RuntimeException;
 use Testcontainers\ContainerClient\DockerContainerClient;
+use Throwable;
 
 class StartedGenericContainer implements StartedTestContainer
 {
@@ -53,7 +55,7 @@ class StartedGenericContainer implements StartedTestContainer
         $exec = $this->dockerClient->containerExec($this->id, $execConfig);
 
         if ($exec === null || $exec->getId() === null) {
-            throw new \RuntimeException('Failed to create exec command');
+            throw new RuntimeException('Failed to create exec command');
         }
 
         $this->lastExecId = $exec->getId();
@@ -95,45 +97,24 @@ class StartedGenericContainer implements StartedTestContainer
         return preg_replace('/[\x00-\x1F\x7F]/u', '', mb_convert_encoding($output, 'UTF-8', 'UTF-8')) ?? '';
     }
 
-    //TODO: replace with the proper implementation
     public function getHost(): string
     {
-        return '127.0.0.1';
+        return $this->inspect()['NetworkSettings']['Gateway'] ?? '127.0.0.1';
     }
 
-    //TODO: not ready yet
     public function getMappedPort(int $port): int
     {
-        return $this->inspect()->ports[$port];
+        $ports = $this->ports();
+        if (isset($ports["{$port}/tcp"][0]['HostPort'])) {
+            return (int) $ports["{$port}/tcp"][0]['HostPort'];
+        }
+
+        throw new RuntimeException("Failed to get mapped port $port for container");
     }
 
-    /**
-     * @throws \JsonException
-     */
     public function getFirstMappedPort(): int
     {
-        //For some reason, containerInspect can crash when using FETCH_OBJECT option (e.g. with OpenSearch)
-        //should be checked within beluga-php/docker-php client library
-        /** @var ResponseInterface | null $containerInspectResponse */
-        $containerInspectResponse =  $this->dockerClient->containerInspect($this->id, [], Docker::FETCH_RESPONSE);
-        if ($containerInspectResponse === null) {
-            throw new \RuntimeException('Failed to inspect container');
-        }
-
-        $containerInspectResponseAsArray = json_decode(
-            $containerInspectResponse->getBody()->getContents(),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
-
-        /** @var array<string, array<array<string, string>>> $ports */
-        $ports = $containerInspectResponseAsArray['NetworkSettings']['Ports'] ?? [];
-
-        if ($ports === []) {
-            throw new \RuntimeException('Failed to get ports from container');
-        }
-
+        $ports = $this->ports();
         $port = array_key_first($ports);
 
         return (int) $ports[$port][0]['HostPort'];
@@ -141,32 +122,75 @@ class StartedGenericContainer implements StartedTestContainer
 
     public function getName(): string
     {
-        // TODO: Implement getName() method.
-        return '';
+        return trim($this->inspect()['Name'], '/ ');
     }
 
+    /**
+     * @return string[]
+     */
     public function getLabels(): array
     {
-        // TODO: Implement getLabels() method.
-        return [];
+        return $this->inspect()['Config']['Labels'] ?? [];
     }
 
-
+    /**
+     * @return string[]
+     */
     public function getNetworkNames(): array
     {
-        // TODO: Implement getNetworkNames() method.
-        return [];
+        $networks = $this->inspect()['NetworkSettings']['Networks'] ?? [];
+        return array_keys($networks);
     }
 
     public function getNetworkId(string $networkName): string
     {
-        // TODO: Implement getNetworkId() method.
-        return '';
+        $networks = $this->inspect()['NetworkSettings']['Networks'];
+        if (isset($networks[$networkName])) {
+            return $networks[$networkName]['NetworkID'];
+        }
+        throw new RuntimeException("Network with name {$networkName} not exists");
     }
 
     public function getIpAddress(string $networkName): string
     {
-        // TODO: Implement getIpAddress() method.
-        return '';
+        $networks = $this->inspect()['NetworkSettings']['Networks'];
+        if (isset($networks[$networkName])) {
+            return $networks[$networkName]['IPAddress'];
+        }
+        throw new RuntimeException("Network with name {$networkName} not exists");
+    }
+
+    private function inspect(): array
+    {
+        //For some reason, containerInspect can crash when using FETCH_OBJECT option (e.g. with OpenSearch)
+        //should be checked within beluga-php/docker-php client library
+        /** @var ResponseInterface | null $containerInspectResponse */
+        $containerInspectResponse =  $this->dockerClient->containerInspect($this->id, [], Docker::FETCH_RESPONSE);
+        if ($containerInspectResponse === null) {
+            throw new RuntimeException('Failed to inspect container');
+        }
+
+        try {
+            return json_decode(
+                $containerInspectResponse->getBody()->getContents(),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Failed to inspect container', 0, $exception);
+        }
+    }
+
+    private function ports(): array
+    {
+        /** @var array<string, array<array<string, string>>> $ports */
+        $ports = $this->inspect()['NetworkSettings']['Ports'] ?? [];
+
+        if ($ports === []) {
+            throw new RuntimeException('Failed to get ports from container');
+        }
+
+        return $ports;
     }
 }

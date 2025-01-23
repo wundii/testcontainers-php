@@ -17,6 +17,8 @@ class MySQLContainer extends GenericContainer
         $this->withWait(new WaitForExec([
             "mysqladmin",
             "ping",
+            "-u", "root",
+            "-p{$mysqlRootPassword}",
             "-h", "127.0.0.1",
         ]));
     }
