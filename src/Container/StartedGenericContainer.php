@@ -7,24 +7,26 @@ namespace Testcontainers\Container;
 use Docker\API\Client;
 use Docker\API\Model\ContainersIdExecPostBody;
 use Docker\API\Model\ContainersIdJsonGetResponse200;
+use Docker\API\Model\EndpointSettings;
 use Docker\API\Model\IdResponse;
+use Docker\API\Model\PortBinding;
 use Docker\API\Runtime\Client\Client as DockerRuntimeClient;
 use Docker\Docker;
-use JsonException;
-use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Testcontainers\ContainerClient\DockerContainerClient;
-use Throwable;
+use Testcontainers\Utils\HostResolver;
 
 class StartedGenericContainer implements StartedTestContainer
 {
     protected Docker $dockerClient;
 
+    protected ?ContainersIdJsonGetResponse200 $inspectResponse = null;
+
     protected ?string $lastExecId = null;
 
-    public function __construct(protected readonly string $id)
+    public function __construct(protected readonly string $id, ?Docker $dockerClient = null)
     {
-        $this->dockerClient = DockerContainerClient::getDockerClient();
+        $this->dockerClient = $dockerClient ?? DockerContainerClient::getDockerClient();
     }
 
     public function getId(): string
@@ -67,7 +69,7 @@ class StartedGenericContainer implements StartedTestContainer
             ?->getBody()
             ->getContents() ?? '';
 
-        return preg_replace('/[\x00-\x1F\x7F]/u', '', $contents) ?? '';
+        return $this->sanitizeOutput($contents);
     }
 
     public function stop(): StoppedTestContainer
@@ -96,43 +98,52 @@ class StartedGenericContainer implements StartedTestContainer
             ?->getBody()
             ->getContents() ?? '';
 
-        return preg_replace('/[\x00-\x1F\x7F]/u', '', mb_convert_encoding($output, 'UTF-8', 'UTF-8')) ?? '';
+        return $this->sanitizeOutput(mb_convert_encoding($output, 'UTF-8', 'UTF-8'));
     }
 
     public function getHost(): string
     {
-        return '127.0.0.1';
+        return (new HostResolver($this->dockerClient))->resolveHost();
     }
 
     public function getMappedPort(int $port): int
     {
-        $ports = $this->ports();
-        if (isset($ports["{$port}/tcp"][0]['HostPort'])) {
-            return (int) $ports["{$port}/tcp"][0]['HostPort'];
+        $ports = (array) $this->ports();
+        /** @var PortBinding | null $portBinding */
+        $portBinding = $ports["{$port}/tcp"][0] ?? null;
+        $mappedPort = $portBinding?->getHostPort();
+        if ($mappedPort !== null) {
+            return (int) $mappedPort;
         }
 
-        throw new RuntimeException("Failed to get mapped port $port for container");
+        throw new RuntimeException("Failed to get mapped port ‘{$mappedPort}’ for container");
     }
 
     public function getFirstMappedPort(): int
     {
-        $ports = $this->ports();
+        $ports = (array) $this->ports();
         $port = array_key_first($ports);
+        /** @var PortBinding | null  $firstPortBinding */
+        $firstPortBinding = $ports[$port][0] ?? null;
+        $firstMappedPort = $firstPortBinding?->getHostPort();
+        if ($firstMappedPort !== null) {
+            return (int) $firstMappedPort;
+        }
 
-        return (int) $ports[$port][0]['HostPort'];
+        throw new RuntimeException('Failed to get first mapped port for container');
     }
 
     public function getName(): string
     {
-        return trim($this->inspect()['Name'], '/ ');
+        return trim($this->inspect()?->getName() ?? '', '/ ');
     }
 
     /**
-     * @return string[]
+     * @return array<string, string>
      */
     public function getLabels(): array
     {
-        return $this->inspect()['Config']['Labels'] ?? [];
+        return (array) $this->inspect()?->getConfig()?->getLabels();
     }
 
     /**
@@ -140,102 +151,64 @@ class StartedGenericContainer implements StartedTestContainer
      */
     public function getNetworkNames(): array
     {
-        /** @var array{NetworkSettings?: array{Networks?: array<string, mixed>}} $inspectData */
-        $inspectData = $this->inspect();
-        $networks = $inspectData['NetworkSettings']['Networks'] ?? [];
+        $networks = (array) $this->inspect()?->getNetworkSettings()?->getNetworks();
         return array_keys($networks);
     }
 
     public function getNetworkId(string $networkName): string
     {
-        $networks = $this->inspect()['NetworkSettings']['Networks'];
-        if (isset($networks[$networkName])) {
-            return $networks[$networkName]['NetworkID'];
+        $networks = (array) $this->inspect()?->getNetworkSettings()?->getNetworks();
+        /** @var EndpointSettings | null $endpointSettings */
+        $endpointSettings = $networks[$networkName] ?? null;
+        $networkID = $endpointSettings?->getNetworkID();
+        if ($networkID !== null) {
+            return $networkID;
         }
-        throw new RuntimeException("Network with name {$networkName} not exists");
+
+        throw new RuntimeException("Network with name ‘{$networkName}’ does not exist");
     }
 
     public function getIpAddress(string $networkName): string
     {
-        $networks = $this->inspect()['NetworkSettings']['Networks'];
-        if (isset($networks[$networkName])) {
-            return $networks[$networkName]['IPAddress'];
+        $networks = (array) $this->inspect()?->getNetworkSettings()?->getNetworks();
+        /** @var EndpointSettings | null $endpointSettings */
+        $endpointSettings = $networks[$networkName] ?? null;
+        $ipAddress = $endpointSettings?->getIPAddress();
+        if ($ipAddress !== null) {
+            return $ipAddress;
         }
-        throw new RuntimeException("Network with name {$networkName} not exists");
+
+        throw new RuntimeException("Network with name ‘{$networkName}’ does not exist");
     }
 
-    /**
-     * @return array<string, mixed> The container details.
-     * @throws RuntimeException If the container inspection fails or the response format is invalid.
-     * TODO: refactor with object after beluga-php/docker-php client library is fixed
-     */
-    protected function inspect(): array
+    protected function inspect(): ContainersIdJsonGetResponse200 | null
     {
-        try {
-            /**
-             * For some reason, containerInspect can crash when using FETCH_OBJECT option (e.g. with OpenSearch)
-             * This is a workaround until the issue is fixed (should be checked within beluga-php/docker-php client library)
-             */
-            /** @var ResponseInterface | null $containerInspectResponse */
-            $containerInspectResponse = $this->dockerClient->containerInspect($this->id, [], $this->dockerClient::FETCH_RESPONSE);
-            if ($containerInspectResponse === null) {
-                throw new RuntimeException('Failed to inspect container: response is null');
-            }
-
-            // Decode the JSON response as an associative array
-            $decodedResponse = json_decode(
-                $containerInspectResponse->getBody()->getContents(),
-                true,
-                512,
-                JSON_THROW_ON_ERROR
-            );
-
-            if (!is_array($decodedResponse)) {
-                throw new RuntimeException('Failed to inspect container: response is not a valid JSON object');
-            }
-
-            return $decodedResponse;
-        } catch (JsonException $e) {
-            throw new RuntimeException(
-                sprintf('Failed to decode container inspect response: %s', $e->getMessage()),
-                previous: $e
-            );
-        } catch (Throwable $e) {
-            throw new RuntimeException(
-                sprintf('Unexpected error while inspecting container: %s', $e->getMessage()),
-                previous: $e
-            );
+        if ($this->inspectResponse === null) {
+            /** @var ContainersIdJsonGetResponse200 | null $inspectResponse */
+            $inspectResponse = $this->dockerClient->containerInspect($this->id);
+            $this->inspectResponse = $inspectResponse;
         }
+
+        return $this->inspectResponse;
     }
 
     /**
-     * @return array<string, mixed> An associative array containing the `NetworkSettings` details.
-     * @throws RuntimeException If the container inspection is missing the `NetworkSettings` key.
-     */
-    protected function networkSettings(): array
-    {
-        $inspectData = $this->inspect();
-
-        if (!isset($inspectData['NetworkSettings']) || !is_array($inspectData['NetworkSettings'])) {
-            throw new RuntimeException('Missing or invalid NetworkSettings in container inspection');
-        }
-
-        return $inspectData['NetworkSettings'];
-    }
-
-    /**
-     * @return array<string, array<array<string, string>>>
+     * @return array<string, array<PortBinding>>
      * @throws RuntimeException
      */
-    protected function ports(): array
+    protected function ports(): iterable
     {
-        /** @var array<string, array<array<string, string>>> $ports */
-        $ports = $this->networkSettings()['Ports'] ?? [];
+        $ports = $this->inspect()?->getNetworkSettings()?->getPorts();
 
-        if ($ports === []) {
+        if ($ports === null) {
             throw new RuntimeException('Failed to get ports from container');
         }
 
         return $ports;
+    }
+
+    protected function sanitizeOutput(string $output): string
+    {
+        return preg_replace('/[\x00-\x1F\x7F]/u', '', $output) ?? '';
     }
 }
