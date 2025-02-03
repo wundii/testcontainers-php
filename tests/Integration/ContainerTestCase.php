@@ -13,7 +13,9 @@ abstract class ContainerTestCase extends TestCase
 
     protected function tearDown(): void
     {
-        $this->container->stop();
+        if (isset($this->container)) {
+            $this->container->stop();
+        }
         parent::tearDown();
     }
 }

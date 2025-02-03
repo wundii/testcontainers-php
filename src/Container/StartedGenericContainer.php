@@ -6,9 +6,11 @@ namespace Testcontainers\Container;
 
 use Docker\API\Client;
 use Docker\API\Model\ContainersIdExecPostBody;
+use Docker\API\Model\ContainersIdJsonGetResponse200;
 use Docker\API\Model\IdResponse;
 use Docker\API\Runtime\Client\Client as DockerRuntimeClient;
 use Docker\Docker;
+use JsonException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Testcontainers\ContainerClient\DockerContainerClient;
@@ -99,7 +101,7 @@ class StartedGenericContainer implements StartedTestContainer
 
     public function getHost(): string
     {
-        return $this->inspect()['NetworkSettings']['Gateway'] ?? '127.0.0.1';
+        return '127.0.0.1';
     }
 
     public function getMappedPort(int $port): int
@@ -138,7 +140,9 @@ class StartedGenericContainer implements StartedTestContainer
      */
     public function getNetworkNames(): array
     {
-        $networks = $this->inspect()['NetworkSettings']['Networks'] ?? [];
+        /** @var array{NetworkSettings?: array{Networks?: array<string, mixed>}} $inspectData */
+        $inspectData = $this->inspect();
+        $networks = $inspectData['NetworkSettings']['Networks'] ?? [];
         return array_keys($networks);
     }
 
@@ -160,32 +164,73 @@ class StartedGenericContainer implements StartedTestContainer
         throw new RuntimeException("Network with name {$networkName} not exists");
     }
 
-    private function inspect(): array
+    /**
+     * @return array<string, mixed> The container details.
+     * @throws RuntimeException If the container inspection fails or the response format is invalid.
+     * TODO: refactor with object after beluga-php/docker-php client library is fixed
+     */
+    protected function inspect(): array
     {
-        //For some reason, containerInspect can crash when using FETCH_OBJECT option (e.g. with OpenSearch)
-        //should be checked within beluga-php/docker-php client library
-        /** @var ResponseInterface | null $containerInspectResponse */
-        $containerInspectResponse =  $this->dockerClient->containerInspect($this->id, [], Docker::FETCH_RESPONSE);
-        if ($containerInspectResponse === null) {
-            throw new RuntimeException('Failed to inspect container');
-        }
-
         try {
-            return json_decode(
+            /**
+             * For some reason, containerInspect can crash when using FETCH_OBJECT option (e.g. with OpenSearch)
+             * This is a workaround until the issue is fixed (should be checked within beluga-php/docker-php client library)
+             */
+            /** @var ResponseInterface | null $containerInspectResponse */
+            $containerInspectResponse = $this->dockerClient->containerInspect($this->id, [], $this->dockerClient::FETCH_RESPONSE);
+            if ($containerInspectResponse === null) {
+                throw new RuntimeException('Failed to inspect container: response is null');
+            }
+
+            // Decode the JSON response as an associative array
+            $decodedResponse = json_decode(
                 $containerInspectResponse->getBody()->getContents(),
                 true,
                 512,
                 JSON_THROW_ON_ERROR
             );
-        } catch (Throwable $exception) {
-            throw new RuntimeException('Failed to inspect container', 0, $exception);
+
+            if (!is_array($decodedResponse)) {
+                throw new RuntimeException('Failed to inspect container: response is not a valid JSON object');
+            }
+
+            return $decodedResponse;
+        } catch (JsonException $e) {
+            throw new RuntimeException(
+                sprintf('Failed to decode container inspect response: %s', $e->getMessage()),
+                previous: $e
+            );
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                sprintf('Unexpected error while inspecting container: %s', $e->getMessage()),
+                previous: $e
+            );
         }
     }
 
-    private function ports(): array
+    /**
+     * @return array<string, mixed> An associative array containing the `NetworkSettings` details.
+     * @throws RuntimeException If the container inspection is missing the `NetworkSettings` key.
+     */
+    protected function networkSettings(): array
+    {
+        $inspectData = $this->inspect();
+
+        if (!isset($inspectData['NetworkSettings']) || !is_array($inspectData['NetworkSettings'])) {
+            throw new RuntimeException('Missing or invalid NetworkSettings in container inspection');
+        }
+
+        return $inspectData['NetworkSettings'];
+    }
+
+    /**
+     * @return array<string, array<array<string, string>>>
+     * @throws RuntimeException
+     */
+    protected function ports(): array
     {
         /** @var array<string, array<array<string, string>>> $ports */
-        $ports = $this->inspect()['NetworkSettings']['Ports'] ?? [];
+        $ports = $this->networkSettings()['Ports'] ?? [];
 
         if ($ports === []) {
             throw new RuntimeException('Failed to get ports from container');
