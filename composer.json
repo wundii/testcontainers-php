@@ -45,7 +45,7 @@
         "integration:old": "phpunit tests/Integration/OldTests --bootstrap vendor/autoload.php",
         "cs": "php-cs-fixer fix --dry-run",
         "cs:fix": "php-cs-fixer fix",
-        "phpstan": "phpstan analyse"
+        "phpstan": "phpstan analyse --memory-limit=256M"
     },
     "config": {
         "allow-plugins": {

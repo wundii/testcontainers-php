@@ -23,6 +23,9 @@ interface StartedTestContainer
 
     public function getIpAddress(string $networkName): string;
 
+    /**
+     * @return array<string, string>
+     */
     public function getLabels(): array;
 
     public function logs(): string;
@@ -35,6 +38,9 @@ interface StartedTestContainer
 
     public function getNetworkId(string $networkName): string;
 
+    /**
+     * @return string[]
+     */
     public function getNetworkNames(): array;
 
     public function restart(): self;
