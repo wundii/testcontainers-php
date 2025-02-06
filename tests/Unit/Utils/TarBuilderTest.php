@@ -146,7 +146,7 @@ class TarBuilderTest extends TestCase
         mkdir($extractDir);
         $this->extractTar($tarPath, $extractDir);
 
-        $scanned = array_diff(scandir($extractDir), ['.', '..']);
+        $scanned = array_diff(scandir($extractDir) ?: [], ['.', '..']);
         $this->assertCount(0, $scanned, 'Expected empty directory');
     }
 
@@ -166,7 +166,7 @@ class TarBuilderTest extends TestCase
         mkdir($extractDir);
         $this->extractTar($tarPath, $extractDir);
 
-        $scanned = array_diff(scandir($extractDir), ['.', '..']);
+        $scanned = array_diff(scandir($extractDir) ?: [], ['.', '..']);
         $this->assertCount(0, $scanned, 'Expected no files after clear()');
     }
 

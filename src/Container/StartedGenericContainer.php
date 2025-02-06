@@ -6,21 +6,27 @@ namespace Testcontainers\Container;
 
 use Docker\API\Client;
 use Docker\API\Model\ContainersIdExecPostBody;
+use Docker\API\Model\ContainersIdJsonGetResponse200;
+use Docker\API\Model\EndpointSettings;
 use Docker\API\Model\IdResponse;
+use Docker\API\Model\PortBinding;
 use Docker\API\Runtime\Client\Client as DockerRuntimeClient;
 use Docker\Docker;
-use Psr\Http\Message\ResponseInterface;
+use RuntimeException;
 use Testcontainers\ContainerClient\DockerContainerClient;
+use Testcontainers\Utils\HostResolver;
 
 class StartedGenericContainer implements StartedTestContainer
 {
     protected Docker $dockerClient;
 
+    protected ?ContainersIdJsonGetResponse200 $inspectResponse = null;
+
     protected ?string $lastExecId = null;
 
-    public function __construct(protected readonly string $id)
+    public function __construct(protected readonly string $id, ?Docker $dockerClient = null)
     {
-        $this->dockerClient = DockerContainerClient::getDockerClient();
+        $this->dockerClient = $dockerClient ?? DockerContainerClient::getDockerClient();
     }
 
     public function getId(): string
@@ -53,7 +59,7 @@ class StartedGenericContainer implements StartedTestContainer
         $exec = $this->dockerClient->containerExec($this->id, $execConfig);
 
         if ($exec === null || $exec->getId() === null) {
-            throw new \RuntimeException('Failed to create exec command');
+            throw new RuntimeException('Failed to create exec command');
         }
 
         $this->lastExecId = $exec->getId();
@@ -63,7 +69,7 @@ class StartedGenericContainer implements StartedTestContainer
             ?->getBody()
             ->getContents() ?? '';
 
-        return preg_replace('/[\x00-\x1F\x7F]/u', '', $contents) ?? '';
+        return $this->sanitizeOutput($contents);
     }
 
     public function stop(): StoppedTestContainer
@@ -92,81 +98,117 @@ class StartedGenericContainer implements StartedTestContainer
             ?->getBody()
             ->getContents() ?? '';
 
-        return preg_replace('/[\x00-\x1F\x7F]/u', '', mb_convert_encoding($output, 'UTF-8', 'UTF-8')) ?? '';
+        return $this->sanitizeOutput(mb_convert_encoding($output, 'UTF-8', 'UTF-8'));
     }
 
-    //TODO: replace with the proper implementation
     public function getHost(): string
     {
-        return '127.0.0.1';
+        return (new HostResolver($this->dockerClient))->resolveHost();
     }
 
-    //TODO: not ready yet
     public function getMappedPort(int $port): int
     {
-        return $this->inspect()->ports[$port];
+        $ports = (array) $this->ports();
+        /** @var PortBinding | null $portBinding */
+        $portBinding = $ports["{$port}/tcp"][0] ?? null;
+        $mappedPort = $portBinding?->getHostPort();
+        if ($mappedPort !== null) {
+            return (int) $mappedPort;
+        }
+
+        throw new RuntimeException("Failed to get mapped port ‘{$mappedPort}’ for container");
     }
 
-    /**
-     * @throws \JsonException
-     */
     public function getFirstMappedPort(): int
     {
-        //For some reason, containerInspect can crash when using FETCH_OBJECT option (e.g. with OpenSearch)
-        //should be checked within beluga-php/docker-php client library
-        /** @var ResponseInterface | null $containerInspectResponse */
-        $containerInspectResponse =  $this->dockerClient->containerInspect($this->id, [], Docker::FETCH_RESPONSE);
-        if ($containerInspectResponse === null) {
-            throw new \RuntimeException('Failed to inspect container');
-        }
-
-        $containerInspectResponseAsArray = json_decode(
-            $containerInspectResponse->getBody()->getContents(),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
-
-        /** @var array<string, array<array<string, string>>> $ports */
-        $ports = $containerInspectResponseAsArray['NetworkSettings']['Ports'] ?? [];
-
-        if ($ports === []) {
-            throw new \RuntimeException('Failed to get ports from container');
-        }
-
+        $ports = (array) $this->ports();
         $port = array_key_first($ports);
+        /** @var PortBinding | null  $firstPortBinding */
+        $firstPortBinding = $ports[$port][0] ?? null;
+        $firstMappedPort = $firstPortBinding?->getHostPort();
+        if ($firstMappedPort !== null) {
+            return (int) $firstMappedPort;
+        }
 
-        return (int) $ports[$port][0]['HostPort'];
+        throw new RuntimeException('Failed to get first mapped port for container');
     }
 
     public function getName(): string
     {
-        // TODO: Implement getName() method.
-        return '';
+        return trim($this->inspect()?->getName() ?? '', '/ ');
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function getLabels(): array
     {
-        // TODO: Implement getLabels() method.
-        return [];
+        return (array) $this->inspect()?->getConfig()?->getLabels();
     }
 
-
+    /**
+     * @return string[]
+     */
     public function getNetworkNames(): array
     {
-        // TODO: Implement getNetworkNames() method.
-        return [];
+        $networks = (array) $this->inspect()?->getNetworkSettings()?->getNetworks();
+        return array_keys($networks);
     }
 
     public function getNetworkId(string $networkName): string
     {
-        // TODO: Implement getNetworkId() method.
-        return '';
+        $networks = (array) $this->inspect()?->getNetworkSettings()?->getNetworks();
+        /** @var EndpointSettings | null $endpointSettings */
+        $endpointSettings = $networks[$networkName] ?? null;
+        $networkID = $endpointSettings?->getNetworkID();
+        if ($networkID !== null) {
+            return $networkID;
+        }
+
+        throw new RuntimeException("Network with name ‘{$networkName}’ does not exist");
     }
 
     public function getIpAddress(string $networkName): string
     {
-        // TODO: Implement getIpAddress() method.
-        return '';
+        $networks = (array) $this->inspect()?->getNetworkSettings()?->getNetworks();
+        /** @var EndpointSettings | null $endpointSettings */
+        $endpointSettings = $networks[$networkName] ?? null;
+        $ipAddress = $endpointSettings?->getIPAddress();
+        if ($ipAddress !== null) {
+            return $ipAddress;
+        }
+
+        throw new RuntimeException("Network with name ‘{$networkName}’ does not exist");
+    }
+
+    protected function inspect(): ContainersIdJsonGetResponse200 | null
+    {
+        if ($this->inspectResponse === null) {
+            /** @var ContainersIdJsonGetResponse200 | null $inspectResponse */
+            $inspectResponse = $this->dockerClient->containerInspect($this->id);
+            $this->inspectResponse = $inspectResponse;
+        }
+
+        return $this->inspectResponse;
+    }
+
+    /**
+     * @return array<string, array<PortBinding>>
+     * @throws RuntimeException
+     */
+    protected function ports(): iterable
+    {
+        $ports = $this->inspect()?->getNetworkSettings()?->getPorts();
+
+        if ($ports === null) {
+            throw new RuntimeException('Failed to get ports from container');
+        }
+
+        return $ports;
+    }
+
+    protected function sanitizeOutput(string $output): string
+    {
+        return preg_replace('/[\x00-\x1F\x7F]/u', '', $output) ?? '';
     }
 }
