@@ -63,4 +63,4 @@ jobs:
       run: composer install --prefer-dist --no-progress
 
     - name: Run test suite
-      run: composer run integration
+      run: ./vendor/bin/phpunit
