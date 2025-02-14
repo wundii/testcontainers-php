@@ -118,13 +118,13 @@ class GenericContainerTest extends TestCase
     public function testShouldReturnFirstMappedPort(): void
     {
         $container = (new GenericContainer('nginx'))
-            ->withPortGenerator(new FixedPortGenerator([8080]))
+            ->withPortGenerator(new FixedPortGenerator([9950]))
             ->withExposedPorts(80)
-            ->withWait(new WaitForHostPort(8080))
+            ->withWait(new WaitForHostPort(9950))
             ->start();
         $firstMappedPort = $container->getFirstMappedPort();
 
-        self::assertSame($firstMappedPort, 8080, 'First mapped port does not match 8080');
+        self::assertSame($firstMappedPort, 9950, 'First mapped port does not match 9950');
 
         $container->stop();
     }
