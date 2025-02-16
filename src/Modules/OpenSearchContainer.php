@@ -15,7 +15,7 @@ class OpenSearchContainer extends GenericContainer
         $this->withExposedPorts(9200);
         $this->withEnvironment([
             'discovery.type' => 'single-node',
-            'OPENSEARCH_INITIAL_ADMIN_PASSWORD' => 'c3o_ZPHo!'
+            'OPENSEARCH_INITIAL_ADMIN_PASSWORD' => 'c3o_ZPHo!',
         ]);
 
         $this->withWait(new WaitForLog(
