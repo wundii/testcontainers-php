@@ -18,7 +18,7 @@ class MySQLContainer extends GenericContainer
             "mysqladmin",
             "ping",
             "-h", "127.0.0.1",
-        ]));
+        ], null, 15000));
     }
 
     public function withMySQLUser(string $username, string $password): self
