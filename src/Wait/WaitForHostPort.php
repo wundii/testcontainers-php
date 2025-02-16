@@ -9,18 +9,9 @@ use Testcontainers\Exception\ContainerWaitingTimeoutException;
 
 class WaitForHostPort extends BaseWaitStrategy
 {
-    public function __construct(
-        protected int $port,
-        int $timeout = 10000,
-        int $pollInterval = 500
-    ) {
-        parent::__construct($timeout, $pollInterval);
-    }
-
     public function wait(StartedTestContainer $container): void
     {
         $startTime = microtime(true) * 1000;
-        $containerAddress = $container->getHost();
 
         while (true) {
             $elapsedTime = (microtime(true) * 1000) - $startTime;
@@ -29,12 +20,34 @@ class WaitForHostPort extends BaseWaitStrategy
                 throw new ContainerWaitingTimeoutException($container->getId());
             }
 
-            if ($this->isPortOpen($containerAddress, $this->port)) {
+            if ($this->boundPortsOpened($container)) {
                 return; // Port is open, container is ready
             }
 
             usleep($this->pollInterval * 1000); // Wait for the next polling interval
         }
+    }
+
+    /**
+     * @param StartedTestContainer $container
+     * @return bool
+     */
+    private function boundPortsOpened(StartedTestContainer $container): bool
+    {
+        $boundPorts = $container->getBoundPorts();
+        foreach ($boundPorts as $bindings) {
+            foreach ($bindings as $binding) {
+                $hostIp = trim($binding->getHostIp() ?? '');
+                if ($hostIp === '' || $hostIp === '0.0.0.0') {
+                    $hostIp = $container->getHost();
+                }
+                $hostPort = (int)$binding->getHostPort();
+                if (!$this->isPortOpen($hostIp, $hostPort)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private function isPortOpen(string $ipAddress, int $port): bool

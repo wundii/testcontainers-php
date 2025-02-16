@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Testcontainers\Tests\Integration;
 
 use Testcontainers\Container\GenericContainer;
+use Testcontainers\Wait\WaitForHostPort;
 
 class StartedGenericContainerTest extends ContainerTestCase
 {
