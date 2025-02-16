@@ -112,9 +112,6 @@ class GenericContainerTest extends TestCase
         $container->stop();
     }
 
-    /**
-     * @throws \JsonException
-     */
     public function testShouldReturnFirstMappedPort(): void
     {
         $container = (new GenericContainer('nginx'))

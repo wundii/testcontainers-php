@@ -13,7 +13,7 @@ class MariaDBContainer extends GenericContainer
     {
         parent::__construct('mariadb:' . $version);
         $this->withExposedPorts(3306);
-        $this->withEnvironment('MARIADB_ROOT_PASSWORD', $mysqlRootPassword);
+        $this->withEnvironment(['MARIADB_ROOT_PASSWORD' => $mysqlRootPassword]);
         $this->withWait(new WaitForExec([
             "mariadb-admin",
             "ping",
@@ -23,15 +23,15 @@ class MariaDBContainer extends GenericContainer
 
     public function withMariaDBUser(string $username, string $password): self
     {
-        $this->withEnvironment('MARIADB_USER', $username);
-        $this->withEnvironment('MARIADB_PASSWORD', $password);
+        $this->withEnvironment(['MARIADB_USER' => $username]);
+        $this->withEnvironment(['MARIADB_PASSWORD' => $password]);
 
         return $this;
     }
 
     public function withMariaDBDatabase(string $database): self
     {
-        $this->withEnvironment('MARIADB_DATABASE', $database);
+        $this->withEnvironment(['MARIADB_DATABASE' => $database]);
 
         return $this;
     }

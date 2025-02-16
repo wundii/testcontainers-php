@@ -19,10 +19,9 @@ interface TestContainer
     public function withEntrypoint(string $entryPoint): static;
 
     /**
-     * TODO: replace with array after deprecated implementation is removed
-     * @param array<string, string>|string $env
+     * @param array<string, string> $env An array of key-value pairs
      */
-    public function withEnvironment(array | string $env, ?string $value): static;
+    public function withEnvironment(array $env): static;
 
     /**  @param int|string|array<int|string> $ports One or more ports to expose. */
     public function withExposedPorts(...$ports): static;

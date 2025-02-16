@@ -154,25 +154,13 @@ class GenericContainer implements TestContainer
     }
 
     /**
-     * To support temporarily backwards compatibility, the method supports two formats:
-     * 1. A single key-value pair (deprecated): $object->withEnvironment('key', 'value');
-     * 2. An array of key-value pairs: $object->withEnvironment(['key1' => 'value1', 'key2' => 'value2']);
-     *
-     * @param string | array<string, string> $env An array of environment variables or the name of a single variable.
-     * @param string|null $value The value of the environment variable if a single variable is passed.
+     * @param array<string, string> $env An array of key-value pairs: $object->withEnvironment(['key1' => 'value1', 'key2' => 'value2']);
      * @return static Returns itself for chaining purposes.
      */
-    public function withEnvironment(string | array $env, ?string $value = null): static
+    public function withEnvironment(array $env): static
     {
-        if (is_array($env)) {
-            foreach ($env as $key => $val) {
-                $this->env[$key] = $val;
-            }
-        } else {
-            if ($value === null) {
-                throw new InvalidArgumentException("Value cannot be null when setting a single environment variable.");
-            }
-            $this->env[$env] = $value;
+        foreach ($env as $key => $val) {
+            $this->env[$key] = $val;
         }
 
         return $this;
@@ -267,7 +255,6 @@ class GenericContainer implements TestContainer
         return $this;
     }
 
-    //TODO: not yet implemented
     public function withNetwork(string $networkName): static
     {
         $this->networkName = $networkName;
