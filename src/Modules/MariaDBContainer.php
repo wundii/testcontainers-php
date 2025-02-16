@@ -18,7 +18,7 @@ class MariaDBContainer extends GenericContainer
             "mariadb-admin",
             "ping",
             "-h", "127.0.0.1",
-        ]));
+        ], null, 15000));
     }
 
     public function withMariaDBUser(string $username, string $password): self

@@ -7,7 +7,6 @@ namespace Testcontainers\Tests\Integration;
 use Docker\API\Model\ContainersIdJsonGetResponse200;
 use PHPUnit\Framework\TestCase;
 use Testcontainers\Container\GenericContainer;
-use Testcontainers\Utils\PortGenerator\FixedPortGenerator;
 use Testcontainers\Wait\WaitForHostPort;
 
 class GenericContainerTest extends TestCase
@@ -115,13 +114,12 @@ class GenericContainerTest extends TestCase
     public function testShouldReturnFirstMappedPort(): void
     {
         $container = (new GenericContainer('nginx'))
-            ->withPortGenerator(new FixedPortGenerator([9950]))
             ->withExposedPorts(80)
-            ->withWait(new WaitForHostPort(9950))
+            ->withWait(new WaitForHostPort())
             ->start();
         $firstMappedPort = $container->getFirstMappedPort();
 
-        self::assertSame($firstMappedPort, 9950, 'First mapped port does not match 9950');
+        self::assertSame($firstMappedPort, $container->getMappedPort(80));
 
         $container->stop();
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Testcontainers\Container;
 
+use Docker\API\Model\PortBinding;
 use Docker\Docker;
 
 interface StartedTestContainer
@@ -12,6 +13,11 @@ interface StartedTestContainer
      * @param list<string> $command
      */
     public function exec(array $command): string;
+
+    /**
+     * @return iterable<string, array<PortBinding>>
+     */
+    public function getBoundPorts(): iterable;
 
     public function getClient(): Docker;
 
