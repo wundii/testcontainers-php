@@ -6,7 +6,6 @@ namespace Testcontainers\Tests\Integration;
 
 use Docker\API\Model\ContainersIdJsonGetResponse200;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Testcontainers\Container\GenericContainer;
 use Testcontainers\Utils\PortGenerator\FixedPortGenerator;
 use Testcontainers\Wait\WaitForHostPort;
