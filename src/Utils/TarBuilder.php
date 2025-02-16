@@ -136,9 +136,16 @@ class TarBuilder
 
     private function runTarCommand(string $tarFilePath, string $sourceDir): void
     {
+        if (PHP_OS_FAMILY === 'Darwin') {
+            $additionalFlags = ' --disable-copyfile --no-xattrs';
+        } else {
+            $additionalFlags = '';
+        }
+
         // without --disable-copyfile and --no-xattrs combination, tar will fail on macOS
         $cmd = sprintf(
-            'tar --no-xattrs --disable-copyfile -cf %s -C %s . 2>&1',
+            'tar %s -cf %s -C %s . 2>&1',
+            $additionalFlags,
             escapeshellarg($tarFilePath),
             escapeshellarg($sourceDir)
         );

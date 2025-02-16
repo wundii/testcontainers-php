@@ -108,7 +108,7 @@ class StartedGenericContainer implements StartedTestContainer
 
     public function getMappedPort(int $port): int
     {
-        $ports = (array) $this->ports();
+        $ports = (array) $this->getBoundPorts();
         /** @var PortBinding | null $portBinding */
         $portBinding = $ports["{$port}/tcp"][0] ?? null;
         $mappedPort = $portBinding?->getHostPort();
@@ -121,7 +121,7 @@ class StartedGenericContainer implements StartedTestContainer
 
     public function getFirstMappedPort(): int
     {
-        $ports = (array) $this->ports();
+        $ports = (array) $this->getBoundPorts();
         $port = array_key_first($ports);
         /** @var PortBinding | null  $firstPortBinding */
         $firstPortBinding = $ports[$port][0] ?? null;
@@ -193,10 +193,10 @@ class StartedGenericContainer implements StartedTestContainer
     }
 
     /**
-     * @return array<string, array<PortBinding>>
+     * @return iterable<string, array<PortBinding>>
      * @throws RuntimeException
      */
-    protected function ports(): iterable
+    public function getBoundPorts(): iterable
     {
         $ports = $this->inspect()?->getNetworkSettings()?->getPorts();
 

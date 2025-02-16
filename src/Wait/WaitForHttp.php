@@ -39,16 +39,6 @@ class WaitForHttp extends BaseWaitStrategy
     }
 
     /**
-     * @deprecated Use constructor instead
-     * Kept for backward compatibility
-     * Should be removed in next major version
-     */
-    public static function make(int $port): self
-    {
-        return new self($port);
-    }
-
-    /**
      * @param HttpMethod|value-of<HttpMethod> $method
      */
     public function withMethod(HttpMethod | string $method): self

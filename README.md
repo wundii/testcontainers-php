@@ -43,6 +43,7 @@ use Testcontainers\Wait\WaitForExec;
 use Testcontainers\Wait\WaitForLog;
 use Testcontainers\Wait\WaitForHttp;
 use Testcontainers\Wait\WaitForHealthCheck;
+use Testcontainers\Wait\WaitForHostPort;
 
 $container = new GenericContainer('nginx:alpine');
 
@@ -58,7 +59,10 @@ $container->withWait(new WaitForLog('Ready to accept connections'));
 
 
 // Wait for an http request to succeed
-$container->withWait(WaitForHttp::make($port, $method = 'GET', $path = '/'));
+$container->withWait(new WaitForHttp($port, $method = 'GET', $path = '/'));
+
+// Wait for all bound ports to be open
+$container->withWait(new WaitForHostPort());
 
 // Wait until the docker heartcheck is green
 $container->withWait(new WaitForHealthCheck());
