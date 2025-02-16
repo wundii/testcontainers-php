@@ -13,7 +13,7 @@ class MySQLContainer extends GenericContainer
     {
         parent::__construct('mysql:' . $version);
         $this->withExposedPorts(3306);
-        $this->withEnvironment('MYSQL_ROOT_PASSWORD', $mysqlRootPassword);
+        $this->withEnvironment(['MYSQL_ROOT_PASSWORD' => $mysqlRootPassword]);
         $this->withWait(new WaitForExec([
             "mysqladmin",
             "ping",
@@ -23,15 +23,15 @@ class MySQLContainer extends GenericContainer
 
     public function withMySQLUser(string $username, string $password): self
     {
-        $this->withEnvironment('MYSQL_USER', $username);
-        $this->withEnvironment('MYSQL_PASSWORD', $password);
+        $this->withEnvironment(['MYSQL_USER' => $username]);
+        $this->withEnvironment(['MYSQL_PASSWORD' => $password]);
 
         return $this;
     }
 
     public function withMySQLDatabase(string $database): self
     {
-        $this->withEnvironment('MYSQL_DATABASE', $database);
+        $this->withEnvironment(['MYSQL_DATABASE' => $database]);
 
         return $this;
     }

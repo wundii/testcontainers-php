@@ -13,8 +13,11 @@ class OpenSearchContainer extends GenericContainer
     {
         parent::__construct('opensearchproject/opensearch:' . $version);
         $this->withExposedPorts(9200);
-        $this->withEnvironment('discovery.type', 'single-node');
-        $this->withEnvironment('OPENSEARCH_INITIAL_ADMIN_PASSWORD', 'c3o_ZPHo!');
+        $this->withEnvironment([
+            'discovery.type' => 'single-node',
+            'OPENSEARCH_INITIAL_ADMIN_PASSWORD' => 'c3o_ZPHo!',
+        ]);
+
         $this->withWait(new WaitForLog(
             '/\]\s+started\?\[/',
             true,
@@ -24,7 +27,7 @@ class OpenSearchContainer extends GenericContainer
 
     public function withDisabledSecurityPlugin(): self
     {
-        $this->withEnvironment('plugins.security.disabled', 'true');
+        $this->withEnvironment(['plugins.security.disabled' => 'true']);
 
         return $this;
     }
