@@ -112,14 +112,11 @@ class GenericContainerTest extends TestCase
         $container->stop();
     }
 
-    /**
-     * @throws \JsonException
-     */
     public function testShouldReturnFirstMappedPort(): void
     {
-        $container = (new GenericContainer('nginx'))
+        $container = (new GenericContainer('cristianrgreco/testcontainer:1.1.14'))
             ->withPortGenerator(new FixedPortGenerator([8080]))
-            ->withExposedPorts(80)
+            ->withExposedPorts(8080)
             ->withWait(new WaitForHostPort(8080))
             ->start();
         $firstMappedPort = $container->getFirstMappedPort();
