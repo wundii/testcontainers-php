@@ -4,75 +4,139 @@ declare(strict_types=1);
 
 namespace Testcontainers\Wait;
 
-use Testcontainers\Exception\ContainerNotReadyException;
-use Testcontainers\Trait\DockerContainerAwareTrait;
+use Testcontainers\Container\HttpMethod;
+use Testcontainers\Container\StartedTestContainer;
+use Testcontainers\Exception\ContainerWaitingTimeoutException;
 
-class WaitForHttp implements WaitInterface
+class WaitForHttp extends BaseWaitStrategy
 {
-    use DockerContainerAwareTrait;
+    protected HttpMethod $method = HttpMethod::GET;
 
-    public const METHOD_GET = 'GET';
-    public const METHOD_POST = 'POST';
-    public const METHOD_PUT = 'PUT';
-    public const METHOD_DELETE = 'DELETE';
-    public const METHOD_HEAD = 'HEAD';
-    public const METHOD_OPTIONS = 'OPTIONS';
+    protected string $path = '/';
 
+    protected string $protocol = 'http';
 
-    private string $method = 'GET';
-    private string $path = '/';
-    private int $statusCode = 200;
+    protected int $expectedStatusCode = 200;
 
-    public function __construct(private int $port)
-    {
-    }
+    protected bool $allowInsecure = false;
 
-    public static function make(int $port): self
-    {
-        return new WaitForHttp($port);
+    /**
+     * @var array<string, string>
+     */
+    protected array $headers = [];
+
+    /**
+     * @var int Timeout in milliseconds for reading the response
+     */
+    protected int $readTimeout = 1000;
+
+    public function __construct(
+        protected int $port,
+        int $timeout = 10000,
+        int $pollInterval = 500
+    ) {
+        parent::__construct($timeout, $pollInterval);
     }
 
     /**
-     * @param WaitForHttp::METHOD_* $method
+     * @param HttpMethod|value-of<HttpMethod> $method
      */
-    public function withMethod(string $method): self
+    public function withMethod(HttpMethod | string $method): self
     {
+        if (is_string($method)) {
+            $method = HttpMethod::fromString($method);
+        }
         $this->method = $method;
-
         return $this;
     }
 
     public function withPath(string $path): self
     {
         $this->path = $path;
-
         return $this;
     }
 
-    public function withStatusCode(int $statusCode): self
+    public function withExpectedStatusCode(int $statusCode): self
     {
-        $this->statusCode = $statusCode;
-
+        $this->expectedStatusCode = $statusCode;
         return $this;
     }
 
-    public function wait(string $id): void
+    public function usingHttps(): self
     {
-        $containerAddress = self::dockerContainerAddress(containerId: $id);
+        $this->protocol = 'https';
+        return $this;
+    }
 
+    public function allowInsecure(): self
+    {
+        $this->allowInsecure = true;
+        return $this;
+    }
+
+    public function withReadTimeout(int $timeout): self
+    {
+        $this->readTimeout = $timeout;
+        return $this;
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    public function withHeaders(array $headers): self
+    {
+        $this->headers = $headers;
+        return $this;
+    }
+
+    public function wait(StartedTestContainer $container): void
+    {
+        $startTime = microtime(true) * 1000;
+
+        while (true) {
+            $elapsedTime = (microtime(true) * 1000) - $startTime;
+
+            if ($elapsedTime > $this->timeout) {
+                throw new ContainerWaitingTimeoutException($container->getId());
+            }
+
+            $containerAddress = $container->getHost();
+
+            $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $this->port, $this->path);
+            $responseCode = $this->makeHttpRequest($url);
+
+            if ($responseCode === $this->expectedStatusCode) {
+                return; // Container is ready
+            }
+
+            usleep($this->pollInterval * 1000);
+        }
+    }
+
+    private function makeHttpRequest(string $url): int
+    {
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, sprintf('http://%s:%d%s', $containerAddress, $this->port, $this->path));
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $this->method->value);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $this->method);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_NOBODY, true);
+        curl_setopt($ch, CURLOPT_NOBODY, true); // No need for response body, just headers
+        curl_setopt($ch, CURLOPT_TIMEOUT_MS, $this->readTimeout);
 
-        curl_exec($ch);
-
-        if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== $this->statusCode) {
-            throw new ContainerNotReadyException($id, new \RuntimeException('HTTP status code does not match'));
+        // Allow insecure connections if requested
+        if ($this->allowInsecure) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         }
 
+        // Add custom headers
+        if (!empty($this->headers)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array_map(static fn ($k, $v) => "$k: $v", array_keys($this->headers), $this->headers));
+        }
+
+        curl_exec($ch);
+        $responseCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        return $responseCode;
     }
 }
