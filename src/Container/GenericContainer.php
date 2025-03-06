@@ -411,9 +411,12 @@ class GenericContainer implements TestContainer
 
         if ($this->networkName !== null) {
             $networkingConfig = new NetworkingConfig();
-            $endpointsConfig = new \ArrayObject([
-                $this->networkName => new EndpointSettings(),
-            ]);
+            $endpointsConfig = [
+                $this->networkName => new EndpointSettings([
+                    'networkID' => $this->networkName,
+                    'aliases' => $this->name ? [$this->name] : [],
+                ]),
+            ];
             $networkingConfig->setEndpointsConfig($endpointsConfig);
             $containerCreatePostBody->setNetworkingConfig($networkingConfig);
         }
