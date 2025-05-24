@@ -31,7 +31,7 @@ class WaitForHttp extends BaseWaitStrategy
     protected int $readTimeout = 1000;
 
     public function __construct(
-        protected int $port,
+        protected ?int $port = null,
         int $timeout = 10000,
         int $pollInterval = 500
     ) {
@@ -100,13 +100,18 @@ class WaitForHttp extends BaseWaitStrategy
                 throw new ContainerWaitingTimeoutException($container->getId());
             }
 
-            $containerAddress = $container->getHost();
+            try {
+                $this->resolvePort($container);
+                $containerAddress = $container->getHost();
 
-            $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $this->port, $this->path);
-            $responseCode = $this->makeHttpRequest($url);
+                $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $this->port, $this->path);
+                $responseCode = $this->makeHttpRequest($url);
 
-            if ($responseCode === $this->expectedStatusCode) {
-                return; // Container is ready
+                if ($responseCode === $this->expectedStatusCode) {
+                    return; // Container is ready
+                }
+            } catch (\RuntimeException) {
+                // Port resolution or HTTP request failed, we'll try again until timeout
             }
 
             usleep($this->pollInterval * 1000);
@@ -120,7 +125,7 @@ class WaitForHttp extends BaseWaitStrategy
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $this->method->value);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_NOBODY, true); // No need for response body, just headers
+        curl_setopt($ch, CURLOPT_NOBODY, true); // No need for a response body, just headers
         curl_setopt($ch, CURLOPT_TIMEOUT_MS, $this->readTimeout);
 
         // Allow insecure connections if requested
@@ -138,5 +143,12 @@ class WaitForHttp extends BaseWaitStrategy
         curl_close($ch);
 
         return $responseCode;
+    }
+
+    private function resolvePort(StartedTestContainer $container): void
+    {
+        if ($this->port === null) {
+            $this->port = $container->getFirstMappedPort();
+        }
     }
 }
