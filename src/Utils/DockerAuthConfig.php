@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Testcontainers\Utils;
 
 use RuntimeException;
+use JsonException;
 
 class DockerAuthConfig
 {
@@ -87,9 +88,10 @@ class DockerAuthConfig
         // First check DOCKER_AUTH_CONFIG environment variable
         $envConfig = getenv('DOCKER_AUTH_CONFIG');
         if ($envConfig !== false && $envConfig !== '') {
-            $configData = json_decode($envConfig, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new RuntimeException('Invalid JSON in DOCKER_AUTH_CONFIG: ' . json_last_error_msg());
+            try {
+                $configData = json_decode($envConfig, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException $e) {
+                throw new RuntimeException('Invalid JSON in DOCKER_AUTH_CONFIG: ' . $e->getMessage(), 0, $e);
             }
         } else {
             // Try to load from default config files
@@ -101,9 +103,10 @@ class DockerAuthConfig
                         continue;
                     }
 
-                    $configData = json_decode($content, true);
-                    if (json_last_error() !== JSON_ERROR_NONE) {
-                        throw new RuntimeException("Invalid JSON in $expandedPath: " . json_last_error_msg());
+                    try {
+                        $configData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+                    } catch (JsonException $e) {
+                        throw new RuntimeException("Invalid JSON in $expandedPath: " . $e->getMessage(), 0, $e);
                     }
                     break;
                 }
@@ -186,9 +189,14 @@ class DockerAuthConfig
             return null;
         }
 
-        $credentials = json_decode($stdout, true);
-        if (!is_array($credentials) || json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Invalid JSON from credential helper: ' . json_last_error_msg());
+        try {
+            $credentials = json_decode($stdout, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new RuntimeException('Invalid JSON from credential helper: ' . $e->getMessage(), 0, $e);
+        }
+        
+        if (!is_array($credentials)) {
+            throw new RuntimeException('Credential helper returned invalid response');
         }
 
         if (!isset($credentials['Username']) || !isset($credentials['Secret']) ||
