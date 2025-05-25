@@ -24,6 +24,7 @@ use Testcontainers\Utils\PortNormalizer;
 use Testcontainers\Utils\TarBuilder;
 use Testcontainers\Wait\WaitForContainer;
 use Testcontainers\Wait\WaitStrategy;
+use Testcontainers\Utils\DockerAuthConfig;
 
 class GenericContainer implements TestContainer
 {
@@ -473,11 +474,33 @@ class GenericContainer implements TestContainer
     protected function pullImage(): void
     {
         [$fromImage, $tag] = explode(':', $this->image) + [1 => 'latest'];
+
+        // Build headers for the request
+        $headers = [];
+
+        // Try to get authentication for the registry
+        $authConfig = new DockerAuthConfig();
+        $registry = DockerAuthConfig::getRegistryFromImage($fromImage);
+        $credentials = $authConfig->getAuthForRegistry($registry);
+
+        if ($credentials !== null) {
+            // Docker expects the X-Registry-Auth header to be a base64-encoded JSON
+            $authData = [
+                'username' => $credentials['username'],
+                'password' => $credentials['password'],
+            ];
+            $headers['X-Registry-Auth'] = base64_encode(json_encode($authData, JSON_THROW_ON_ERROR));
+        }
+
         /** @var CreateImageStream $imageCreateResponse */
-        $imageCreateResponse = $this->dockerClient->imageCreate(null, [
-            'fromImage' => $fromImage,
-            'tag' => $tag,
-        ]);
+        $imageCreateResponse = $this->dockerClient->imageCreate(
+            null,
+            [
+                'fromImage' => $fromImage,
+                'tag' => $tag,
+            ],
+            $headers
+        );
         $imageCreateResponse->wait();
     }
 }
