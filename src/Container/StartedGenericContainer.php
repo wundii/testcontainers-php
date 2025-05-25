@@ -198,6 +198,13 @@ class StartedGenericContainer implements StartedTestContainer
      */
     public function getBoundPorts(): iterable
     {
+        /**
+         * For some reason, in the latest Docker releases, at this moment, the container might not be fully started.
+         * This can lead to issues when trying to retrieve the ports.
+         * TODO: find a better strategy to ensure the container is fully started or run in a loop until it is ready.
+         * For the loop $this->inspect() shouldn't be cached.
+         */
+        usleep(300 * 1000);
         $ports = $this->inspect()?->getNetworkSettings()?->getPorts();
 
         if ($ports === null) {
