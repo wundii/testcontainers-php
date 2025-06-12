@@ -4,7 +4,7 @@ Testcontainers is a PHP package that makes it simple to create and clean up cont
 
 ## Legacy PHP support
 
-The official `testcontainers/testcontainers` library requires PHP 8.1 or newer. If you need to support older PHP versions, including those that are EOL, check out the community-maintained [k-kinzal/testcontainers-php](https://github.com/k-kinzal/testcontainers-php) project. The discussion about supporting legacy versions lives in [issue #38](https://github.com/testcontainers/testcontainers-php/issues/38).
+The official `testcontainers/testcontainers-php` library requires PHP 8.1 or newer. If you need to support older PHP versions, including those that are EOL, please check out the community-maintained [k-kinzal/testcontainers-php](https://github.com/k-kinzal/testcontainers-php) project. The discussion about supporting legacy versions lives in [issue #38](https://github.com/testcontainers/testcontainers-php/issues/38).
 
 ## Installation
 
