@@ -104,7 +104,7 @@ class WaitForHttp extends BaseWaitStrategy
                 $this->resolvePort($container);
                 $containerAddress = $container->getHost();
 
-                $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $container->getMappedPort($this->port), $this->path);
+                $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $container->getMappedPort((int) $this->port), $this->path);
                 $responseCode = $this->makeHttpRequest($url);
 
                 if ($responseCode === $this->expectedStatusCode) {

@@ -98,6 +98,9 @@ class StartedGenericContainer implements StartedTestContainer
             ?->getBody()
             ->getContents() ?? '';
 
+        /**
+         * @var string|false $converted
+         */
         $converted = mb_convert_encoding($output, 'UTF-8', 'UTF-8');
         return $this->sanitizeOutput($converted === false ? $output : $converted);
     }
