@@ -63,7 +63,7 @@ $container->withWait(new WaitForLog('Ready to accept connections'));
 
 
 // Wait for an http request to succeed
-$container->withWait(new WaitForHttp($port, $method = 'GET', $path = '/'));
+$container->withWait((new WaitForHttp($port))->withMethod('GET')->withPath('/'));
 
 // Wait for all bound ports to be open
 $container->withWait(new WaitForHostPort());
