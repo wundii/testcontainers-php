@@ -129,11 +129,24 @@ class GenericContainerTest extends TestCase
     {
         $container = (new GenericContainer('nginx'))
             ->withExposedPorts(80)
-            ->withWait((new WaitForHttp(80))->withPath('/'))
+            ->withWait((new WaitForHttp())->withMethod('GET')->withPath('/'))
             ->start();
         $firstMappedPort = $container->getFirstMappedPort();
 
         self::assertSame($firstMappedPort, $container->getMappedPort(80));
+
+        $container->stop();
+    }
+
+    public function testShouldReturnMappedPortWithWaitForHttp(): void
+    {
+        $container = (new GenericContainer('nginx'))
+            ->withExposedPorts(80)
+            ->withWait((new WaitForHttp(80))->withMethod('GET')->withPath('/'))
+            ->start();
+        $mappedPort = $container->getMappedPort(80);
+
+        self::assertSame($mappedPort, $container->getFirstMappedPort());
 
         $container->stop();
     }

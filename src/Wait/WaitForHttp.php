@@ -104,7 +104,7 @@ class WaitForHttp extends BaseWaitStrategy
                 $this->resolvePort($container);
                 $containerAddress = $container->getHost();
 
-                $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $container->getMappedPort((int) $this->port), $this->path);
+                $url = sprintf('%s://%s:%d%s', $this->protocol, $containerAddress, $this->port, $this->path);
                 $responseCode = $this->makeHttpRequest($url);
 
                 if ($responseCode === $this->expectedStatusCode) {
@@ -147,8 +147,8 @@ class WaitForHttp extends BaseWaitStrategy
 
     private function resolvePort(StartedTestContainer $container): void
     {
-        if ($this->port === null) {
-            $this->port = $container->getFirstMappedPort();
-        }
+        $this->port = $this->port === null
+            ? $container->getFirstMappedPort()
+            : $container->getMappedPort($this->port);
     }
 }
