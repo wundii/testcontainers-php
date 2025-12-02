@@ -31,14 +31,14 @@ $container->withEnvironment([
     'key2' => 'val2'
 ]);
 
-// enable health check for an container
+// enable health check for a container
 $container->withHealthCheckCommand('curl --fail localhost');
 
 // mount current dir to /var/www/html
 $container->withMount(__DIR__, '/var/www/html');
 ```
 
-Normally you have to wait until the Container is ready. so for this you can define an wait rule:
+Normally, you have to wait until the Container is ready. For this you can define a wait rule:
 
 ```php
 
@@ -62,13 +62,13 @@ $container->withWait(new WaitForExec(['mysqladmin', 'ping', '-h', '127.0.0.1']),
 $container->withWait(new WaitForLog('Ready to accept connections'));
 
 
-// Wait for an http request to succeed
+// Wait for an HTTP request to succeed
 $container->withWait(new WaitForHttp($port, $method = 'GET', $path = '/'));
 
 // Wait for all bound ports to be open
 $container->withWait(new WaitForHostPort());
 
-// Wait until the docker heartcheck is green
+// Wait until the Docker heartcheck is green
 $container->withWait(new WaitForHealthCheck());
 ```
 
@@ -94,7 +94,7 @@ $pdo = new \PDO(
     'baz',
 );
 
-// Do something with pdo
+// Do something with PDO
 ```
 
 ### MariaDB
@@ -119,7 +119,7 @@ $pdo = new \PDO(
     'baz',
 );
 
-// Do something with pdo
+// Do something with PDO
 ```
 
 ### PostgreSQL
@@ -144,7 +144,7 @@ $pdo = new \PDO(
     'test',
 );
 
-// Do something with pdo
+// Do something with PDO
 ```
 
 ### Redis
@@ -159,7 +159,7 @@ $container = (new RedisContainer())
 $redis = new \Redis();
 $redis->connect($container->getHost(), $container->getFirstMappedPort());
 
-// Do something with redis
+// Do something with Redis
 ```
 
 ### OpenSearch
