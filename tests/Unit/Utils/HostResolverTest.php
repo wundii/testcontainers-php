@@ -159,6 +159,11 @@ class HostResolverTest extends TestCase
             {
                 return true;
             }
+
+            protected function findDefaultGateway(): ?string
+            {
+                return null;
+            }
         };
 
         putenv('DOCKER_HOST=unix://docker:2375');
@@ -183,6 +188,11 @@ class HostResolverTest extends TestCase
             protected function isInContainer(): bool
             {
                 return true;
+            }
+
+            protected function findDefaultGateway(): ?string
+            {
+                return null;
             }
         };
 
