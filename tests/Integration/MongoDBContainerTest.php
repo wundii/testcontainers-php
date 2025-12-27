@@ -12,6 +12,10 @@ class MongoDBContainerTest extends ContainerTestCase
 {
     public function setUp(): void
     {
+        if (!extension_loaded('mongodb')) {
+            $this->markTestSkipped('MongoDB extension is not installed');
+        }
+
         $this->container = (new MongoDBContainer())->start();
     }
 
