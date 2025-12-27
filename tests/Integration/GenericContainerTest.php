@@ -8,6 +8,7 @@ use Docker\API\Model\ContainersIdJsonGetResponse200;
 use PHPUnit\Framework\TestCase;
 use Testcontainers\Container\GenericContainer;
 use Testcontainers\Wait\WaitForHostPort;
+use Testcontainers\Wait\WaitForHttp;
 
 class GenericContainerTest extends TestCase
 {
@@ -111,7 +112,7 @@ class GenericContainerTest extends TestCase
         $container->stop();
     }
 
-    public function testShouldReturnFirstMappedPort(): void
+    public function testShouldReturnFirstMappedPortWithWaitForHostPort(): void
     {
         $container = (new GenericContainer('nginx'))
             ->withExposedPorts(80)
@@ -120,6 +121,32 @@ class GenericContainerTest extends TestCase
         $firstMappedPort = $container->getFirstMappedPort();
 
         self::assertSame($firstMappedPort, $container->getMappedPort(80));
+
+        $container->stop();
+    }
+
+    public function testShouldReturnFirstMappedPortWithWaitForHttp(): void
+    {
+        $container = (new GenericContainer('nginx'))
+            ->withExposedPorts(80)
+            ->withWait((new WaitForHttp())->withMethod('GET')->withPath('/'))
+            ->start();
+        $firstMappedPort = $container->getFirstMappedPort();
+
+        self::assertSame($firstMappedPort, $container->getMappedPort(80));
+
+        $container->stop();
+    }
+
+    public function testShouldReturnMappedPortWithWaitForHttp(): void
+    {
+        $container = (new GenericContainer('nginx'))
+            ->withExposedPorts(80)
+            ->withWait((new WaitForHttp(80))->withMethod('GET')->withPath('/'))
+            ->start();
+        $mappedPort = $container->getMappedPort(80);
+
+        self::assertSame($mappedPort, $container->getFirstMappedPort());
 
         $container->stop();
     }

@@ -61,9 +61,8 @@ $container->withWait(new WaitForExec(['mysqladmin', 'ping', '-h', '127.0.0.1']),
 // Wait until that message is in the logs
 $container->withWait(new WaitForLog('Ready to accept connections'));
 
-
-// Wait for an HTTP request to succeed
-$container->withWait(new WaitForHttp($port, $method = 'GET', $path = '/'));
+// Wait for an http request to succeed
+$container->withWait((new WaitForHttp($port))->withMethod('GET')->withPath('/'));
 
 // Wait for all bound ports to be open
 $container->withWait(new WaitForHostPort());

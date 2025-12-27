@@ -147,8 +147,8 @@ class WaitForHttp extends BaseWaitStrategy
 
     private function resolvePort(StartedTestContainer $container): void
     {
-        if ($this->port === null) {
-            $this->port = $container->getFirstMappedPort();
-        }
+        $this->port = $this->port === null
+            ? $container->getFirstMappedPort()
+            : $container->getMappedPort($this->port);
     }
 }
