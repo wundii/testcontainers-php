@@ -479,9 +479,8 @@ class GenericContainer implements TestContainer
         $headers = [];
 
         // Try to get authentication for the registry
-        $authConfig = new DockerAuthConfig();
         $registry = DockerAuthConfig::getRegistryFromImage($fromImage);
-        $credentials = $authConfig->getAuthForRegistry($registry);
+        $credentials = DockerAuthConfig::getInstance()->getAuthForRegistry($registry);
 
         if ($credentials !== null) {
             // Docker expects the X-Registry-Auth header to be a base64-encoded JSON

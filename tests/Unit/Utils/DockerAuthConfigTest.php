@@ -25,6 +25,9 @@ class DockerAuthConfigTest extends TestCase
 
     protected function tearDown(): void
     {
+        // Reset singleton instance to avoid test interference
+        DockerAuthConfig::resetInstance();
+
         // Restore original values
         putenv('HOME=' . $this->originalHome);
         if ($this->originalAuthConfig !== null) {

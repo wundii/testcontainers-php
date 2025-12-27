@@ -14,6 +14,8 @@ class DockerAuthConfig
         '/etc/docker/config.json',
     ];
 
+    private static ?self $instance = null;
+
     /**
      * @var array<string, array{auth?: string, username?: string, password?: string, email?: string}>
      */
@@ -32,20 +34,38 @@ class DockerAuthConfig
     }
 
     /**
+     * Get the singleton instance of DockerAuthConfig.
+     * This avoids re-reading config files/environment on every image pull.
+     */
+    public static function getInstance(): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * Reset the singleton instance (useful for testing).
+     */
+    public static function resetInstance(): void
+    {
+        self::$instance = null;
+    }
+
+    /**
      * Get authentication for a specific registry
      *
      * @return array{username: string, password: string}|null
      */
     public function getAuthForRegistry(string $registry): ?array
     {
-        // Normalize registry URL
         $registry = $this->normalizeRegistry($registry);
 
-        // Check if we have auth directly in config
         if (isset($this->auths[$registry])) {
             $auth = $this->auths[$registry];
 
-            // If auth string is present, decode it
             if (isset($auth['auth'])) {
                 $decoded = base64_decode($auth['auth'], true);
                 if ($decoded === false) {
@@ -59,18 +79,15 @@ class DockerAuthConfig
                 return ['username' => $username, 'password' => $password];
             }
 
-            // If username/password are present directly
             if (isset($auth['username']) && isset($auth['password'])) {
                 return ['username' => $auth['username'], 'password' => $auth['password']];
             }
         }
 
-        // Check credential helpers
         if (isset($this->credHelpers[$registry])) {
             return $this->getCredentialsFromHelper($this->credHelpers[$registry], $registry);
         }
 
-        // Check default credential store
         if ($this->credsStore !== null) {
             return $this->getCredentialsFromHelper($this->credsStore, $registry);
         }
@@ -85,7 +102,6 @@ class DockerAuthConfig
     {
         $configData = null;
 
-        // First check DOCKER_AUTH_CONFIG environment variable
         $envConfig = getenv('DOCKER_AUTH_CONFIG');
         if ($envConfig !== false && $envConfig !== '') {
             try {
@@ -94,7 +110,6 @@ class DockerAuthConfig
                 throw new RuntimeException('Invalid JSON in DOCKER_AUTH_CONFIG: ' . $e->getMessage(), 0, $e);
             }
         } else {
-            // Try to load from default config files
             foreach (self::DEFAULT_CONFIG_PATHS as $path) {
                 $expandedPath = str_replace('~', getenv('HOME') ?: '', $path);
                 if (file_exists($expandedPath)) {
@@ -117,7 +132,6 @@ class DockerAuthConfig
             return;
         }
 
-        // Parse the configuration
         if (isset($configData['auths']) && is_array($configData['auths'])) {
             /** @var array<string, array{auth?: string, username?: string, password?: string, email?: string}> $auths */
             $auths = $configData['auths'];
@@ -144,7 +158,6 @@ class DockerAuthConfig
     {
         $helperCommand = 'docker-credential-' . $helper;
 
-        // Check if helper exists
         $checkCommand = sprintf('command -v %s 2>/dev/null', escapeshellarg($helperCommand));
         $helperPath = trim(shell_exec($checkCommand) ?: '');
 
@@ -152,11 +165,10 @@ class DockerAuthConfig
             return null;
         }
 
-        // Execute the credential helper
         $descriptors = [
-            0 => ['pipe', 'r'], // stdin
-            1 => ['pipe', 'w'], // stdout
-            2 => ['pipe', 'w'], // stderr
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
         ];
 
         $process = proc_open([$helperCommand, 'get'], $descriptors, $pipes);
@@ -165,11 +177,9 @@ class DockerAuthConfig
             throw new RuntimeException("Failed to execute credential helper: $helperCommand");
         }
 
-        // Write the registry to stdin
         fwrite($pipes[0], $registry);
         fclose($pipes[0]);
 
-        // Read the response
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
@@ -178,7 +188,6 @@ class DockerAuthConfig
         $exitCode = proc_close($process);
 
         if ($exitCode !== 0) {
-            // Credentials not found is not an error
             if ($stderr !== false && strpos($stderr, 'credentials not found') !== false) {
                 return null;
             }
@@ -194,7 +203,7 @@ class DockerAuthConfig
         } catch (JsonException $e) {
             throw new RuntimeException('Invalid JSON from credential helper: ' . $e->getMessage(), 0, $e);
         }
-        
+
         if (!is_array($credentials)) {
             throw new RuntimeException('Credential helper returned invalid response');
         }
@@ -215,17 +224,14 @@ class DockerAuthConfig
      */
     private function normalizeRegistry(string $registry): string
     {
-        // Remove protocol if present
         $normalized = preg_replace('#^https?://#', '', $registry);
 
         if ($normalized === null) {
             $normalized = $registry;
         }
 
-        // Remove trailing slashes
         $normalized = rtrim($normalized, '/');
 
-        // Docker Hub special case - normalize to the standard format
         if ($normalized === 'docker.io' || $normalized === 'index.docker.io' || $normalized === 'registry-1.docker.io') {
             return 'https://index.docker.io/v1/';
         }
@@ -233,33 +239,22 @@ class DockerAuthConfig
         return $normalized;
     }
 
-    /**
-     * Get the registry from an image name
-     */
     public static function getRegistryFromImage(string $image): string
     {
-        // First, check if image has a registry prefix by looking for slashes
         $slashPos = strpos($image, '/');
 
         if ($slashPos === false) {
-            // No slash means it's a Docker Hub official image
             return 'docker.io';
         }
 
-        // Extract the potential registry part (everything before the first slash)
         $potentialRegistry = substr($image, 0, $slashPos);
 
-        // Check if this looks like a registry:
-        // - Contains a dot (domain name)
-        // - Contains a colon (port specification)
-        // - Is 'localhost' (special case)
         if (str_contains($potentialRegistry, '.') ||
             str_contains($potentialRegistry, ':') ||
             $potentialRegistry === 'localhost') {
             return $potentialRegistry;
         }
 
-        // Otherwise, it's a Docker Hub image with a namespace
         return 'docker.io';
     }
 }
