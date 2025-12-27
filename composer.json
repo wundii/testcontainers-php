@@ -19,7 +19,6 @@
         "beluga-php/docker-php": "^1.45"
     },
     "require-dev": {
-        "ext-mongodb": "*",
         "ext-pdo": "*",
         "ext-pdo_mysql": "*",
         "ext-pdo_pgsql": "*",
@@ -30,6 +29,9 @@
         "phpstan/phpstan-phpunit": "^1.1",
         "phpstan/extension-installer": "^1.2",
         "predis/predis": "^3.0 || ^2.0"
+    },
+    "suggest": {
+        "ext-mongodb": "Required for MongoDB container support"
     },
     "autoload": {
         "psr-4": {
