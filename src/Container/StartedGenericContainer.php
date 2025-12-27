@@ -99,7 +99,7 @@ class StartedGenericContainer implements StartedTestContainer
             ->getContents() ?? '';
 
         $converted = mb_convert_encoding($output, 'UTF-8', 'UTF-8');
-        return $this->sanitizeOutput($converted === false ? $output : $converted);
+        return $this->sanitizeOutput($converted == false ? $output : $converted);
     }
 
     public function getHost(): string
