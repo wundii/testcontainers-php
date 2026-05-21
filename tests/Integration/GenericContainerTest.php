@@ -298,8 +298,8 @@ class GenericContainerTest extends TestCase
             ->withCommand(['tail', '-f', '/dev/null'])
             ->start();
 
-        $result = $container->exec(['cat', '/proc/mounts']);
-        self::assertStringContainsString('tmpfs /mnt/tmpfs', $result);
+        $result = $container->exec(['stat', '-f', '-c', '%T', '/mnt/tmpfs']);
+        self::assertSame('tmpfs', $result);
 
         $container->stop();
     }
